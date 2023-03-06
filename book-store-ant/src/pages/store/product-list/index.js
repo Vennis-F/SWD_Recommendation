@@ -1,0 +1,312 @@
+import {
+  Button,
+  Card,
+  Col,
+  Divider,
+  Rate,
+  Row,
+  Typography,
+  Breadcrumb,
+  Pagination,
+  message,
+  Result,
+} from 'antd';
+import './styles.less';
+import { HomeOutlined, ShoppingCartOutlined } from '@ant-design/icons';
+
+import WrapperConentContainer from 'layouts/store/wrapper.content';
+import {
+  addProudctToCart,
+  addProudctToCartGuest,
+  getCategoyList,
+  getProductListByCategory,
+} from './service';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import axiosClient from 'util/axiosClient';
+import { getCategoyById } from '../home/service';
+import { MoneyFormat } from 'components/format';
+
+const ProductList = () => {
+  //State
+  const { id: categoryId } = useParams();
+  const navigate = useNavigate();
+  const [categories, setCategories] = useState([]);
+  const [categoryName, setCategoryName] = useState('');
+  const [products, setProducts] = useState([]);
+  const [totalProduct, setTotalProduct] = useState(0);
+
+  const getCategories = () => {
+    getCategoyList()
+      .then((result) => {
+        setCategories(result);
+      })
+      .catch((e) => console.log(e));
+  };
+  const getProducts = (categoryId, page) => {
+    getProductListByCategory(categoryId, { status: true, limit: 12, page })
+      .then(({ product, count }) => {
+        setProducts(product);
+        setTotalProduct(count);
+      })
+      .catch((e) => console.log(e));
+  };
+  const getCategoryName = (categoryId) => {
+    getCategoyById(categoryId)
+      .then((result) => {
+        setCategoryName(result.name);
+      })
+      .catch((e) => console.log(e));
+  };
+  const onChangePage = (page) => {
+    //Get product list again
+    getProducts(categoryId, page);
+  };
+  const addToCart = async (productId) => {
+    const cartItem = {
+      quantity: 1,
+      productId,
+    };
+    try {
+      let cart = {};
+
+      //Guest and customer
+      if (localStorage.getItem('__role') === 'R02')
+        cart = await addProudctToCartGuest(cartItem);
+      else cart = await addProudctToCart(cartItem);
+
+      //Go to cart or not
+      message.success('Thêm vào giỏ hàng thành công', 5);
+    } catch (error) {
+      message.error(`${error.response.data.error}`, 5);
+    }
+  };
+  const requestRecommendationsClick = (objectID) => {
+    axiosClient
+      .post(`/products/recommendation/click/${objectID}`)
+      .then((result) => {
+        console.log(result);
+      });
+  };
+  const requestRecommendationsConverted = (objectID) => {
+    axiosClient
+      .post(`/products/recommendation/converted/${objectID}`)
+      .then((result) => {
+        console.log(result);
+      });
+  };
+
+  useEffect(() => {
+    if (!localStorage.getItem('__token') && !localStorage.getItem('__role')) {
+      console.log('not have jwt store in localStorage');
+      axiosClient.post('/user/guest').then((result) => {
+        localStorage.setItem('__role', result.guest.role.code);
+      });
+    }
+
+    getCategories();
+    getCategoryName(categoryId);
+    getProducts(categoryId, 1);
+  }, [categoryId]);
+
+  return (
+    <>
+      <WrapperConentContainer>
+        <Breadcrumb>
+          <Breadcrumb.Item>
+            <HomeOutlined onClick={() => navigate('/')} />
+          </Breadcrumb.Item>
+          <Breadcrumb.Item>THỂ LOẠI</Breadcrumb.Item>
+          <Breadcrumb.Item>{categoryName}</Breadcrumb.Item>
+        </Breadcrumb>
+      </WrapperConentContainer>
+      <WrapperConentContainer>
+        <Row>
+          <Col style={{ borderRadius: '4px' }} span={5}>
+            <div className="list-options">
+              <div className="option-cate">
+                <h4>THỂ LOẠI</h4>
+                <ul className="list-cates">
+                  {categories.map((item) => (
+                    <li>
+                      <Button
+                        onClick={() => {
+                          // SEND
+                          requestRecommendationsClick(item._id);
+                          navigate(`/product-list/${item._id}`);
+                        }}
+                        type="link"
+                        block
+                        style={
+                          item._id === categoryId
+                            ? { color: '#003a8c', fontWeight: '500' }
+                            : {}
+                        }
+                        // style={{ color: 'red' }}
+                      >
+                        {item.name}
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <Divider style={{ margin: '10px 0' }} />
+              {/* <h4>GIÁ TIỀN</h4>
+              <Checkbox.Group
+                className="checkbox-custom"
+                options={priceOptions}
+                defaultValue={['Pear']}
+                onChange={onChange}
+              /> */}
+            </div>
+          </Col>
+          <Col style={{ backgroundColor: 'white' }} span={19}>
+            {/* <Row>
+              <Col style={{ padding: '40px', paddingBottom: '20px' }} span={24}>
+                Sắp xếp theo:
+                <Select
+                  className="select-product"
+                  defaultValue="top-week"
+                  style={{
+                    width: 160,
+                  }}
+                  // onChange={handleChange}
+                >
+                  <Option value="top-week">Nổi bật tuần</Option>
+                  <Option value="top-month">Nổi bật tháng</Option>
+                  <Option value="top-year">Nổi bật năm</Option>
+                  <Option value="best-week">Bán chạy tuần</Option>
+                  <Option value="best-month">Bán chạy tháng</Option>
+                  <Option value="best-year">Bán chạy năm</Option>
+                </Select>
+                <Select
+                  className="select-product"
+                  defaultValue="12"
+                  style={{
+                    width: 140,
+                  }}
+                  // onChange={handleChange}
+                >
+                  <Option value="12">12 sản phẩm</Option>
+                  <Option value="24">24 sản phẩm</Option>
+                  <Option value="48">48 sản phẩm</Option>
+                </Select>
+              </Col>
+              <Divider style={{ margin: '0 14px' }} />
+            </Row> */}
+            <Row>
+              {products.length !== 0 &&
+                products.map((item) => (
+                  <Col flex={'25%'} style={{ marginBottom: '30px' }}>
+                    <Card
+                      className="product-card"
+                      hoverable={true}
+                      bordered={false}
+                      cover={
+                        <a
+                          style={{ textAlign: 'center' }}
+                          onClick={() => {
+                            //SEND
+                            requestRecommendationsClick(item._id);
+                            navigate(`/product-detail/${item._id}`);
+                          }}
+                        >
+                          <img
+                            style={{
+                              width: '88%',
+                              height: '190px',
+                              // objectFit: 'cover',
+                              margin: '0 auto',
+                            }}
+                            alt="example"
+                            src={item.thumbnail}
+                          />
+                        </a>
+                      }
+                    >
+                      <Typography.Paragraph
+                        className="home-product-title"
+                        ellipsis={{
+                          rows: 2,
+                          // expandable: true,
+                        }}
+                      >
+                        <a
+                          onClick={() => {
+                            //SEND
+                            requestRecommendationsClick(item._id);
+                            navigate(`/product-detail/${item._id}`);
+                          }}
+                        >
+                          {item.title}
+                        </a>
+                      </Typography.Paragraph>
+                      <Typography.Text className="product-sale">
+                        <MoneyFormat>{item.salePrice}</MoneyFormat>
+                      </Typography.Text>
+                      <Typography.Text className="product-price-old">
+                        <MoneyFormat>{item.listPrice}</MoneyFormat>
+                      </Typography.Text>
+                      <Row justify="space-between">
+                        <Col>
+                          <Rate className="product-rate" value={4} />
+                          {/* <MessageOutlined
+                            style={{ marginLeft: '10px', fontSize: '18px' }}
+                          /> */}
+                        </Col>
+                        <Col>
+                          <Typography.Link
+                            onClick={() => {
+                              requestRecommendationsConverted(item._id);
+                              addToCart(item._id);
+                            }}
+                          >
+                            <ShoppingCartOutlined
+                              style={{
+                                zIndex: '199',
+                                marginRight: '10px',
+                                fontSize: '28px',
+                                color: '#C92127',
+                              }}
+                            />
+                          </Typography.Link>
+                        </Col>
+                      </Row>
+                    </Card>
+                  </Col>
+                ))}
+            </Row>
+            {products.length !== 0 ? (
+              <Row>
+                <Col
+                  style={{ textAlign: 'center', marginBottom: '14px' }}
+                  span={24}
+                >
+                  <Pagination
+                    onChange={onChangePage}
+                    pageSize={12}
+                    showSizeChanger={false}
+                    defaultCurrent={1}
+                    total={totalProduct}
+                  />
+                </Col>
+              </Row>
+            ) : (
+              <Row>
+                <Result
+                  style={{ width: '100%' }}
+                  status="404"
+                  // title="404"
+                  subTitle="Hiện tại không có sản phẩm khả thi"
+                />
+              </Row>
+            )}
+          </Col>
+        </Row>
+      </WrapperConentContainer>
+    </>
+  );
+};
+
+export default ProductList;
